@@ -1,0 +1,4 @@
+name: raw.order_payments
+type: duckdb.seed
+parameters:
+  path: "../../data/olist_order_payments_dataset.csv"

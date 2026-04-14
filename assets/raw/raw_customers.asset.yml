@@ -1,0 +1,4 @@
+name: raw.customers
+type: duckdb.seed
+parameters:
+  path: "../../data/olist_customers_dataset.csv"
