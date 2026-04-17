@@ -185,6 +185,8 @@ Total: **24 quality checks** across 15 assets, all passing.
 
 🔗 [View the Olist E-Commerce Analytics Dashboard](https://datastudio.google.com/reporting/3871b131-30d1-4015-8d31-d13f5051091a)
 
+![Olist E-Commerce Analytics Dashboard](Screenshot%202026-04-17%20163410.png)
+
 ### Charts:
 
 **1. Daily Revenue Trend (2016–2018)**
