@@ -1,109 +1,319 @@
-# Bruin - DuckDB Template
+# 🛒 Olist Brazilian E-Commerce Analytics Pipeline
 
-This pipeline is a simple example of a Bruin pipeline for DuckDB,
-featuring `example.sql`—a SQL asset that creates a table with sample data and enforces schema constraints
-like `not_null`, `unique`, and `primary_key`.
+An end-to-end data engineering pipeline built with **Bruin**, **AWS S3**, **AWS Athena**, and **Looker Studio** to analyze Brazilian e-commerce trends from 2016 to 2018.
 
-It also includes a `macros/` folder with reusable Jinja macros for common SQL patterns:
-- **aggregations.sql**: Common aggregation patterns (count_by, sum_by, top_n)
-- **filters.sql**: Common filtering patterns (date_range, recent_records, filter_null, in_list)
-- **transformations.sql**: Data transformation helpers (pivot_sum, deduplicate, generate_surrogate_key, safe_divide)
+---
 
-The `macro_example.sql` asset demonstrates how to use these macros in your queries.
+## 📌 Problem Statement
 
-## Setup
-The pipeline already includes an empty `.bruin.yml` file, fill it with your connections and environments. You can read more about connections [here](https://getbruin.com/docs/bruin/commands/connections.html).
+Brazilian e-commerce has grown rapidly in recent years. This project investigates:
 
-Here's a sample `.bruin.yml` file:
+- **How has daily revenue evolved** between 2016 and 2018?
+- **Which Brazilian states** generate the most e-commerce revenue?
+- **Which product categories** are the top revenue drivers?
 
+By answering these questions, businesses can make informed decisions about regional expansion, marketing spend, and inventory prioritization.
+
+---
+
+## 📦 Dataset
+
+**Source:** [Olist Brazilian E-Commerce Public Dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) on Kaggle
+
+Olist is the largest department store in Brazilian marketplaces. The dataset contains ~100,000 orders placed between 2016 and 2018 across multiple Brazilian marketplaces.
+
+### Tables used:
+
+| File | Description | Rows |
+|---|---|---|
+| olist_orders_dataset.csv | Core order information and status | ~99K |
+| olist_order_items_dataset.csv | Items within each order, price, freight | ~112K |
+| olist_order_payments_dataset.csv | Payment method and value per order | ~104K |
+| olist_customers_dataset.csv | Customer location and unique ID | ~99K |
+| olist_products_dataset.csv | Product category and dimensions | ~33K |
+| olist_sellers_dataset.csv | Seller location | ~3K |
+
+---
+
+## 🏗️ Architecture
+┌─────────────────────────────────────────────────────────┐
+│                     DATA SOURCES                         │
+│           Olist CSV Files (Kaggle Download)              │
+└─────────────────────┬───────────────────────────────────┘
+│
+▼
+┌─────────────────────────────────────────────────────────┐
+│                   AWS S3 BUCKET                          │
+│            sara-olist-pipeline/raw/                      │
+│  orders/ customers/ order_items/ payments/               │
+│  products/ sellers/                                      │
+└─────────────────────┬───────────────────────────────────┘
+│
+▼
+┌─────────────────────────────────────────────────────────┐
+│               AWS ATHENA (Raw Layer)                     │
+│   External tables pointing directly to S3 CSV files      │
+│   olist.raw_orders, olist.raw_customers, ...             │
+└─────────────────────┬───────────────────────────────────┘
+│  Bruin Pipeline
+▼
+┌─────────────────────────────────────────────────────────┐
+│            AWS ATHENA (Staging Layer)                    │
+│   SQL transformations: type casting, null handling,      │
+│   deduplication, standardization + quality checks        │
+│   staging.stg_orders, staging.stg_customers, ...         │
+└─────────────────────┬───────────────────────────────────┘
+│  Bruin Pipeline
+▼
+┌─────────────────────────────────────────────────────────┐
+│              AWS ATHENA (Mart Layer)                     │
+│   Aggregated business metrics ready for dashboarding     │
+│   mart.daily_revenue                                     │
+│   mart.revenue_by_state                                  │
+│   mart.top_product_categories                            │
+└─────────────────────┬───────────────────────────────────┘
+│
+▼
+┌─────────────────────────────────────────────────────────┐
+│              LOOKER STUDIO DASHBOARD                     │
+│   3 interactive charts answering the problem statement   │
+└─────────────────────────────────────────────────────────┘
+
+---
+
+## 🛠️ Technology Stack
+
+| Component | Tool | Purpose |
+|---|---|---|
+| Pipeline tool | [Bruin](https://getbruin.com) | Orchestration, transformation, quality checks |
+| Raw storage | AWS S3 | Store raw CSV files |
+| Data warehouse | AWS Athena | Query engine on top of S3 (Iceberg tables) |
+| Local development | DuckDB | Fast local iteration before pushing to cloud |
+| Dashboard | Looker Studio | Visualization and reporting |
+| Version control | GitHub | Code repository |
+| CLI | AWS CLI | Infrastructure management |
+
+---
+
+## 🔧 What is Bruin?
+
+[Bruin](https://getbruin.com) is an open-source end-to-end data pipeline tool that replaces the need for separate tools like Airflow (orchestration), dbt (transformation), and Great Expectations (quality checks). Everything lives in one place:
+
+- **Assets** are SQL or Python files with a `@bruin` header defining metadata, dependencies, and quality checks
+- **Lineage** is automatically inferred from `depends:` declarations
+- **Quality checks** run automatically after each asset executes
+- **Environments** allow switching between local DuckDB and cloud Athena with one flag
+
+### Example Bruin asset:
+
+```sql
+/* @bruin
+name: staging.stg_orders
+type: athena.sql
+materialization:
+  type: table
+depends:
+  - raw.orders
+columns:
+  - name: order_id
+    type: varchar
+    checks:
+      - name: not_null
+      - name: unique
+@bruin */
+
+SELECT
+    order_id,
+    customer_id,
+    order_status,
+    TRY_CAST(order_purchase_timestamp AS TIMESTAMP) AS order_purchase_timestamp
+FROM olist.raw_orders
+WHERE order_id IS NOT NULL
+```
+
+---
+
+## 📁 Project Structure
+olist-ecommerce-pipeline/
+├── .bruin.yml              # Environment configs (gitignored - contains secrets)
+├── pipeline.yml            # Pipeline definition
+├── README.md
+├── assets/
+│   ├── raw/                # Seed assets loading CSVs into DuckDB (local dev)
+│   │   ├── raw_orders.asset.yml
+│   │   ├── raw_customers.asset.yml
+│   │   ├── raw_order_items.asset.yml
+│   │   ├── raw_order_payments.asset.yml
+│   │   ├── raw_products.asset.yml
+│   │   └── raw_sellers.asset.yml
+│   ├── staging/            # Cleaning, casting, validation
+│   │   ├── stg_orders.sql
+│   │   ├── stg_customers.sql
+│   │   ├── stg_order_items.sql
+│   │   ├── stg_order_payments.sql
+│   │   ├── stg_products.sql
+│   │   └── stg_sellers.sql
+│   └── mart/               # Aggregated business metrics
+│       ├── mart_daily_revenue.sql
+│       ├── mart_revenue_by_state.sql
+│       └── mart_top_product_categories.sql
+└── macros/                 # Reusable Jinja SQL macros
+
+---
+
+## 📊 Pipeline Layers
+
+### Raw Layer
+External Athena tables pointing directly to CSV files stored in S3. No transformation — data is read as-is from:
+s3://sara-olist-pipeline/raw/orders/
+s3://sara-olist-pipeline/raw/customers/
+...
+
+### Staging Layer
+SQL assets that clean and standardize the raw data:
+- Cast string columns to proper types (`TRY_CAST` for safe casting)
+- Standardize text (`LOWER`, `UPPER`, `TRIM`)
+- Handle nulls with `COALESCE`
+- Filter out header rows and invalid records
+- Run quality checks on every column
+
+### Mart Layer
+Aggregated tables ready for dashboarding:
+
+| Table | Description |
+|---|---|
+| `mart.daily_revenue` | Daily order count, total revenue, freight, avg order value |
+| `mart.revenue_by_state` | Revenue, orders, and customers grouped by Brazilian state |
+| `mart.top_product_categories` | Revenue and order count per product category |
+
+---
+
+## ✅ Data Quality
+
+Bruin runs quality checks automatically after each asset. Checks used in this project:
+
+| Check | Description | Applied to |
+|---|---|---|
+| `not_null` | Column has no null values | All key columns |
+| `unique` | Column has no duplicate values | Primary keys |
+| `positive` | All values are > 0 | Revenue, price |
+| `non_negative` | All values are >= 0 | Payment value |
+
+Total: **24 quality checks** across 15 assets, all passing.
+
+---
+
+## 📈 Dashboard
+
+🔗 [View the Olist E-Commerce Analytics Dashboard](https://datastudio.google.com/reporting/3871b131-30d1-4015-8d31-d13f5051091a)
+
+### Charts:
+
+**1. Daily Revenue Trend (2016–2018)**
+Shows how revenue grew over time. Key observation: revenue was low in late 2016, grew steadily through 2017, peaked in late 2017/early 2018, with a notable spike likely corresponding to Black Friday promotions.
+
+**2. Revenue by Brazilian State**
+São Paulo (SP) dominates with ~40% of total revenue, followed by Rio de Janeiro (RJ) and Minas Gerais (MG). This reflects Brazil's population distribution and economic concentration in the Southeast.
+
+**3. Top Product Categories by Revenue**
+Health & beauty products lead revenue, followed by watches/gifts and furniture/décor. This suggests Brazilian consumers prioritize personal care and home goods in online shopping.
+
+---
+
+## 🚀 How to Reproduce
+
+### Prerequisites
+- [Bruin CLI](https://getbruin.com/docs/bruin/getting-started/introduction/installation.html) installed
+- AWS CLI configured (`aws configure`)
+- Python 3.8+ with `pandas` installed
+- Git Bash (on Windows)
+
+### Step 1 — Clone the repository
+```bash
+git clone https://github.com/seyedehsara/olist-ecommerce-pipeline.git
+cd olist-ecommerce-pipeline
+```
+
+### Step 2 — Download the dataset
+Download from [Kaggle](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) and place all CSV files in the `data/` folder.
+
+### Step 3 — Configure Bruin
+Create a `.bruin.yml` file in the project root:
 
 ```yaml
+default_environment: default
+
 environments:
   default:
     connections:
       duckdb:
-        - name: "duckdb_default"
-          path: "/path/to/your/database.db"
-      
+        - name: "duckdb-default"
+          path: "olist.duckdb"
+
+  production:
+    connections:
+      athena:
+        - name: "athena-default"
+          region: "eu-west-1"
+          database: "olist"
+          access_key_id: "YOUR_AWS_ACCESS_KEY_ID"
+          secret_access_key: "YOUR_AWS_SECRET_ACCESS_KEY"
+          query_results_path: "s3://YOUR-BUCKET/athena-results/"
 ```
 
-## Running the pipeline
-
-bruin CLI can run the whole pipeline or any task with the downstreams:
-
-```shell
-
-bruin run ./duckdb/pipeline.yml
+### Step 4 — Run locally with DuckDB
+```bash
+bruin run . --workers 1
 ```
 
-You can also run a single task:
+### Step 5 — Set up AWS infrastructure
+```bash
+# Create S3 bucket
+aws s3 mb s3://YOUR-BUCKET --region eu-west-1
 
-```shell
-bruin run assets/hello.py                            
+# Upload CSV files to S3
+aws s3 cp data/ s3://YOUR-BUCKET/raw/ --recursive --region eu-west-1
+
+# Create Athena databases
+aws athena start-query-execution \
+  --query-string "CREATE DATABASE IF NOT EXISTS olist" \
+  --result-configuration "OutputLocation=s3://YOUR-BUCKET/athena-results/" \
+  --region eu-west-1
+
+aws athena start-query-execution \
+  --query-string "CREATE DATABASE IF NOT EXISTS staging" \
+  --result-configuration "OutputLocation=s3://YOUR-BUCKET/athena-results/" \
+  --region eu-west-1
+
+aws athena start-query-execution \
+  --query-string "CREATE DATABASE IF NOT EXISTS mart" \
+  --result-configuration "OutputLocation=s3://YOUR-BUCKET/athena-results/" \
+  --region eu-west-1
 ```
 
-```shell
-Starting the pipeline execution...
-
-[2023-03-16T18:25:59Z] [worker-0] Running: hello
-[2023-03-16T18:26:00Z] [worker-0] [hello] >> Hello, world!
-[2023-03-16T18:26:00Z] [worker-0] Completed: hello (103ms)
-
-
-Executed 1 tasks in 103ms
+### Step 6 — Run staging and mart on Athena
+```bash
+for f in assets/staging/*.sql assets/mart/*.sql; do
+  bruin run $f --environment production --workers 1 --no-log-file
+done
 ```
 
-You can optionally pass a `--downstream` flag to run the task with all of its downstreams.
+---
 
-## Using Macros
+## 🔑 Key Results
 
-The `macros/` folder contains reusable Jinja macros that are automatically available in all your SQL assets. Here are some examples:
+- Processed **~100,000 orders** across 6 tables
+- **15 pipeline assets** with **24 quality checks** all passing
+- São Paulo accounts for **~40% of total revenue**
+- **Health & beauty** is the #1 revenue category
+- Revenue grew approximately **3x** between late 2016 and mid-2018
 
-### Aggregation Macros
-```sql
--- Count records by a column
-{{ count_by('example', 'country') }}
+---
 
--- Sum a column grouped by another
-{{ sum_by('sales', 'country', 'revenue') }}
+## 📝 Notes
 
--- Get top N records
-{{ top_n('example', 'id', 5) }}
-```
+- `.bruin.yml` is gitignored — never commit credentials
+- Raw Athena tables are external tables pointing to S3 — no data duplication
+- Staging and mart tables are materialized as Iceberg tables in Athena
+- Local development uses DuckDB for fast iteration without AWS costs
 
-### Filter Macros
-```sql
--- Filter by date range
-{{ date_range('orders', 'created_at', '2024-01-01', '2024-12-31') }}
-
--- Get recent records
-{{ recent_records('events', 'timestamp', 30) }}
-
--- Filter out nulls
-{{ filter_null('users', ['email', 'name']) }}
-
--- Filter by list of values
-{{ in_list('example', 'country', ['spain', 'germany']) }}
-```
-
-### Transformation Macros
-```sql
--- Generate a surrogate key from multiple columns
-SELECT {{ generate_surrogate_key(['id', 'country']) }}, *
-FROM example
-
--- Safe division (avoids divide by zero)
-SELECT
-    country,
-    COUNT(*) as count,
-    {{ safe_divide('revenue', 'count') }} as avg_revenue
-FROM sales
-GROUP BY country
-
--- Deduplicate records
-{{ deduplicate('events', 'user_id', 'timestamp') }}
-```
-
-Check out `assets/macro_example.sql` for more examples!
-
-That's it, good luck!
