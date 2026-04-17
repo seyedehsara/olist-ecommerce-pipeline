@@ -110,12 +110,14 @@ WHERE order_id IS NOT NULL
 ---
 
 ## 📁 Project Structure
+
+```
 olist-ecommerce-pipeline/
-├── .bruin.yml              # Environment configs (gitignored - contains secrets)
+├── .bruin.yml              # Environment configs (gitignored)
 ├── pipeline.yml            # Pipeline definition
 ├── README.md
 ├── assets/
-│   ├── raw/                # Seed assets loading CSVs into DuckDB (local dev)
+│   ├── raw/                # Seed assets (local DuckDB dev)
 │   │   ├── raw_orders.asset.yml
 │   │   ├── raw_customers.asset.yml
 │   │   ├── raw_order_items.asset.yml
@@ -134,7 +136,7 @@ olist-ecommerce-pipeline/
 │       ├── mart_revenue_by_state.sql
 │       └── mart_top_product_categories.sql
 └── macros/                 # Reusable Jinja SQL macros
-
+```
 ---
 
 ## 📊 Pipeline Layers
