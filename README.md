@@ -35,50 +35,26 @@ Olist is the largest department store in Brazilian marketplaces. The dataset con
 
 ---
 
-## 🏗️ Architecture
-┌─────────────────────────────────────────────────────────┐
-│                     DATA SOURCES                         │
-│           Olist CSV Files (Kaggle Download)              │
-└─────────────────────┬───────────────────────────────────┘
-│
-▼
-┌─────────────────────────────────────────────────────────┐
-│                   AWS S3 BUCKET                          │
-│            sara-olist-pipeline/raw/                      │
-│  orders/ customers/ order_items/ payments/               │
-│  products/ sellers/                                      │
-└─────────────────────┬───────────────────────────────────┘
-│
-▼
-┌─────────────────────────────────────────────────────────┐
-│               AWS ATHENA (Raw Layer)                     │
-│   External tables pointing directly to S3 CSV files      │
-│   olist.raw_orders, olist.raw_customers, ...             │
-└─────────────────────┬───────────────────────────────────┘
-│  Bruin Pipeline
-▼
-┌─────────────────────────────────────────────────────────┐
-│            AWS ATHENA (Staging Layer)                    │
-│   SQL transformations: type casting, null handling,      │
-│   deduplication, standardization + quality checks        │
-│   staging.stg_orders, staging.stg_customers, ...         │
-└─────────────────────┬───────────────────────────────────┘
-│  Bruin Pipeline
-▼
-┌─────────────────────────────────────────────────────────┐
-│              AWS ATHENA (Mart Layer)                     │
-│   Aggregated business metrics ready for dashboarding     │
-│   mart.daily_revenue                                     │
-│   mart.revenue_by_state                                  │
-│   mart.top_product_categories                            │
-└─────────────────────┬───────────────────────────────────┘
-│
-▼
-┌─────────────────────────────────────────────────────────┐
-│              LOOKER STUDIO DASHBOARD                     │
-│   3 interactive charts answering the problem statement   │
-└─────────────────────────────────────────────────────────┘
 
+## 🏗️ Architecture
+
+The pipeline follows a medallion architecture with three layers:
+
+**1. Ingestion**
+CSV files are downloaded from Kaggle and uploaded to AWS S3. Athena external tables are created on top of the S3 files — no data is moved or duplicated at this stage.
+
+**2. Staging**
+Bruin SQL assets read from the raw Athena tables and apply cleaning transformations: type casting, null handling, text standardization, and data quality checks. Results are materialized as Iceberg tables in Athena.
+
+**3. Mart**
+Bruin SQL assets join and aggregate the staging tables into three business-level tables ready for dashboarding: daily revenue, revenue by state, and top product categories.
+
+**4. Dashboard**
+Looker Studio connects to the mart tables and presents three interactive charts.
+
+### Data Flow
+
+> Kaggle CSVs → AWS S3 → Athena Raw Tables → Bruin Staging → Bruin Mart → Looker Studio
 ---
 
 ## 🛠️ Technology Stack
