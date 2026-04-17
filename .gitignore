@@ -5,3 +5,7 @@ __pycache__/
 .bruin/
 *.log
 data/
+
+logs/runs
+logs/*.log
+*.py[cod]

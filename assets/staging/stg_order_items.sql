@@ -1,6 +1,6 @@
 /* @bruin
 name: staging.stg_order_items
-type: duckdb.sql
+type: athena.sql
 materialization:
   type: table
 depends:
@@ -11,7 +11,7 @@ columns:
     checks:
       - name: not_null
   - name: price
-    type: float
+    type: double
     checks:
       - name: not_null
       - name: positive
@@ -22,9 +22,10 @@ SELECT
     order_item_id,
     product_id,
     seller_id,
-    CAST(shipping_limit_date AS TIMESTAMP) AS shipping_limit_date,
-    ROUND(CAST(price AS DOUBLE), 2)          AS price,
-    ROUND(CAST(freight_value AS DOUBLE), 2)  AS freight_value,
-    ROUND(CAST(price AS DOUBLE) + CAST(freight_value AS DOUBLE), 2) AS total_amount
-FROM raw.order_items
+    TRY_CAST(shipping_limit_date AS TIMESTAMP)  AS shipping_limit_date,
+    ROUND(TRY_CAST(price AS DOUBLE), 2)          AS price,
+    ROUND(TRY_CAST(freight_value AS DOUBLE), 2)  AS freight_value,
+    ROUND(TRY_CAST(price AS DOUBLE) + TRY_CAST(freight_value AS DOUBLE), 2) AS total_amount
+FROM olist.raw_order_items
 WHERE order_id IS NOT NULL
+  AND order_id != 'order_id'

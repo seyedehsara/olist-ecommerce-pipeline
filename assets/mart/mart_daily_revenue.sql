@@ -1,6 +1,6 @@
 /* @bruin
 name: mart.daily_revenue
-type: duckdb.sql
+type: athena.sql
 materialization:
   type: table
 depends:
@@ -12,7 +12,7 @@ columns:
     checks:
       - name: not_null
   - name: total_revenue
-    type: float
+    type: double
     checks:
       - name: not_null
       - name: positive

@@ -1,6 +1,6 @@
 /* @bruin
 name: staging.stg_sellers
-type: duckdb.sql
+type: athena.sql
 materialization:
   type: table
 depends:
@@ -18,5 +18,6 @@ SELECT
     seller_zip_code_prefix,
     LOWER(TRIM(seller_city))  AS seller_city,
     UPPER(TRIM(seller_state)) AS seller_state
-FROM raw.sellers
+FROM olist.raw_sellers
 WHERE seller_id IS NOT NULL
+  AND seller_id != 'seller_id'

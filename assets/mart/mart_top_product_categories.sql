@@ -1,6 +1,6 @@
 /* @bruin
 name: mart.top_product_categories
-type: duckdb.sql
+type: athena.sql
 materialization:
   type: table
 depends:
@@ -13,7 +13,7 @@ columns:
     checks:
       - name: not_null
   - name: total_revenue
-    type: float
+    type: double
     checks:
       - name: not_null
 @bruin */
